@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - materials - video - webcam</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	</head>
+	<body>
+
+		<video id="video" autoplay style="display:none"></video>
+
+		<script type="module">
+			import * as THREE from './three/build/three.module.js'
+
+			import { OrbitControls } from './three/examples/jsm/controls/OrbitControls.js'
+			import { EffectComposer } from './three/examples/jsm/postprocessing/EffectComposer.js';
+			import { RenderPass } from './three/examples/jsm/postprocessing/RenderPass.js';
+			import { ShaderPass } from './three/examples/jsm/postprocessing/ShaderPass.js';
+			import { ColorifyShader } from './three/examples/jsm/shaders/ColorifyShader.js';
+			import { BlendShader } from './three/examples/jsm/shaders/BlendShader.js';
+
+			var scene, camera, renderer, container, target1, target2;
+
+			var greenComposer, blueComposer, blendComposer;
+
+			window.addEventListener( 'resize', onWindowResize, false );
+
+			var perspective = window.innerWidth / window.innerHeight;
+
+			var video = document.getElementById( 'video' );
+
+			var video_params = {
+					minFilter: THREE.LinearFilter,
+					magFilter: THREE.LinearFilter,
+					format:    THREE.RGBAFormat
+				};
+
+			init();
+			animate();
+
+			function init() {
+
+				renderer = new THREE.WebGLRenderer();
+				renderer.setClearColor( 0xffffff );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.autoClear = false;
+
+				container = document.createElement('div');
+				document.body.appendChild( container );
+				container.appendChild( renderer.domElement );
+
+				scene  = new THREE.Scene();
+				camera = new THREE.PerspectiveCamera( 90, perspective, 0.1, 3000 );
+				camera.position.z = 100;
+
+				var texture  = new THREE.VideoTexture( video, video_params );
+				var geometry = new THREE.PlaneBufferGeometry( 200.0, 100.0 );
+				var material = new THREE.MeshBasicMaterial( { map: texture } );
+				var mesh     = new THREE.Mesh( geometry, material );
+				mesh.lookAt( camera.position );
+				mesh.position.set = ( 0, 0, 0 );
+				scene.add( mesh );
+
+				target1 = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat } );
+				target2 = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat } );
+
+				var renderPass = new RenderPass( scene, camera );
+
+				var greenShader = new ShaderPass( ColorifyShader );
+				greenShader.uniforms['color'].value = new THREE.Color( 0x00ff00 );
+				greenShader.clear = false;
+
+				greenComposer = new EffectComposer( renderer, target1 );
+				greenComposer.rendertoScreen = false;
+				greenComposer.addPass( renderPass );
+				greenComposer.addPass( greenShader );
+
+				var blueShader = new ShaderPass( ColorifyShader );
+				blueShader.uniforms['color'].value = new THREE.Color( 0x0000ff );
+				blueShader.clear = false;
+
+				blueComposer = new EffectComposer( renderer, target2 );
+				blueComposer.rendertoScreen = false;
+				blueComposer.addPass( renderPass );
+				blueComposer.addPass( blueShader );
+
+				var blendShader = new ShaderPass( BlendShader );
+				blendShader.uniforms['tDiffuse'].value = target1.texture; //greenComposer.renderTarget1.texture;
+				blendShader.uniforms['tDiffuse1'].value = target2.texture; //blueComposer.renderTarget2.texture;
+
+				blendComposer = new EffectComposer( renderer );
+				blendComposer.rendertoScreen = true;
+				blendComposer.addPass( renderPass );
+				blendComposer.addPass( blendShader );
+
+				var controls = new OrbitControls( camera, renderer.domElement );
+				controls.enableZoom = false;
+				controls.enablePan = false;
+
+
+				play_video();
+
+				animate();
+
+			}
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+				renderer.clear();
+				greenComposer.render();
+				blueComposer.render();
+				blendComposer.render();
+
+			}
+
+			function play_video(){
+
+				if ( navigator.mediaDevices && navigator.mediaDevices.getUserMedia ) {
+
+					var constraints = {
+						video: { width: 1280, height: 720, facingMode: 'user' }
+					};
+
+					navigator.mediaDevices.getUserMedia( constraints ).then( function ( stream ) {
+
+						// apply the stream to the video element used in the texture
+						video.srcObject = stream;
+						video.play();
+
+					} ).catch( function ( error ) {
+						console.error( 'Unable to access the camera/webcam.', error );
+					} );
+
+				} else {
+					console.error( 'MediaDevices interface not available.' );
+				}
+
+			}
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+	</script>
+ </body>
+</html>
