@@ -40,7 +40,7 @@
 
 			function init() {
 
-				renderer = new THREE.WebGLRenderer();
+				renderer = new THREE.WebGLRenderer( { preserveDrawingBuffer: true } );
 				renderer.setClearColor( 0xffffff );
 				renderer.setPixelRatio( window.devicePixelRatio );
 				renderer.setSize( window.innerWidth, window.innerHeight );
@@ -62,42 +62,41 @@
 				mesh.position.set = ( 0, 0, 0 );
 				scene.add( mesh );
 
-				target1 = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat } );
-				target2 = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat } );
+				target1 = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, depthBuffer: true } );
+
+				target2 = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, depthBuffer: true } );
 
 				var renderPass = new RenderPass( scene, camera );
 
 				var greenShader = new ShaderPass( ColorifyShader );
 				greenShader.uniforms['color'].value = new THREE.Color( 0x00ff00 );
-				greenShader.clear = false;
 
 				greenComposer = new EffectComposer( renderer, target1 );
-				greenComposer.rendertoScreen = false;
+				greenComposer.renderToScreen = false;
 				greenComposer.addPass( renderPass );
 				greenComposer.addPass( greenShader );
 
 				var blueShader = new ShaderPass( ColorifyShader );
 				blueShader.uniforms['color'].value = new THREE.Color( 0x0000ff );
-				blueShader.clear = false;
 
 				blueComposer = new EffectComposer( renderer, target2 );
-				blueComposer.rendertoScreen = false;
+				blueComposer.renderToScreen = false;
 				blueComposer.addPass( renderPass );
 				blueComposer.addPass( blueShader );
 
 				var blendShader = new ShaderPass( BlendShader );
-				blendShader.uniforms['tDiffuse'].value = target1.texture; //greenComposer.renderTarget1.texture;
-				blendShader.uniforms['tDiffuse1'].value = target2.texture; //blueComposer.renderTarget2.texture;
+				blendShader.uniforms['tDiffuse'].value = greenComposer.readBuffer.texture;
+				blendShader.uniforms['tDiffuse1'].value = blueComposer.readBuffer.texture;
+				blendShader.uniforms['mixRatio'].value = 0.5;
 
 				blendComposer = new EffectComposer( renderer );
-				blendComposer.rendertoScreen = true;
+				blendComposer.renderToScreen = true;
 				blendComposer.addPass( renderPass );
 				blendComposer.addPass( blendShader );
 
 				var controls = new OrbitControls( camera, renderer.domElement );
 				controls.enableZoom = false;
 				controls.enablePan = false;
-
 
 				play_video();
 
@@ -108,10 +107,11 @@
 			function animate() {
 
 				requestAnimationFrame( animate );
-				renderer.clear();
+
 				greenComposer.render();
 				blueComposer.render();
 				blendComposer.render();
+
 
 			}
 
